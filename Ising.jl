@@ -174,7 +174,7 @@ function energyIsing(MPS, J, i)
     #vérifier que la norme du mps est bien 1 (si pas le cas normaliser la contraction précédente par la norme du tenseur)
 
     #%% orthonormalisation
-    m = length(MPS)
+    m = length(MPS)##
     if !(1 < i < m)
         error("site is not in the mps")
     end
