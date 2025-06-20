@@ -40,7 +40,7 @@ function isingTensor(Beta, J, h)
     for i in 1:2
         D[i, i, i, i] = 1
     end
-    M = isingMatrix(Beta, J, h)
+    M = sqrt(isingMatrix(Beta, J, h))
     @tensor T[i,j,k,l] := D[a, b, c, d] * M[i,a] * M[j,b] * M[k,c] * M[l,d]
     return T
 end
@@ -167,39 +167,48 @@ i - site du MPS sur lequel on calcule l'énergie
 
 return l'énergie sur le site i du MPS
 """
-function energyIsing(MPS, J, i)
+function energyIsing(mps, J, i)#mettre un ! au debut du nom de la fonction pour spécifier que la fonction modifie l'input
     #mettre en left et right canonical par rapport au tenseur i 
     #garder seulement le centre car toute l'information du mps y est 
     #contracter entre le tenseur et le dagger la matrice énergie et contracter tous les axes 
     #vérifier que la norme du mps est bien 1 (si pas le cas normaliser la contraction précédente par la norme du tenseur)
 
     #%% orthonormalisation
-    m = length(MPS)
+    m = length(mps)
     if !(1 < i < m)
         error("site is not in the mps")
     end
     Z = energytensor(J)
     #@show size(MPS[1:i]), size(canonicalleft(MPS[1:i])[1])
-    MPS[1:i] = canonicalleft(MPS[1:i])[1]
+    mps[begin:i] = canonicalleft(mps[begin:i])[1]
+    #verif
+    I = tensorcontract(mps[i-1], (1, 2, -1), conj(mps[i-1]), (1, 2, -2))
+    @show I ≈ LinearAlgebra.I(size(I, 1))
+    I2 = tensorcontract(mps[i+1], (1, -1, 2), conj(mps[i+1]), (1, -2, 2))
+    @show I2 ≈ LinearAlgebra.I(size(I2, 1))
     #%% contraction
-    @show size(MPS[i]), typeof(MPS[i])
-    D = permutedims(conj(MPS[i]), (1,3,2))
-    N = tensorcontract(MPS[i], (1, 2, 3), D, (1, 3, 2))
+    @show size(mps[i]), typeof(mps[i])
+    D = permutedims(conj(mps[i]), (1,3,2))
+    N = tensorcontract(mps[i], (1, 2, 3), D, (1, 3, 2))
     @show N
-    inter = tensorcontract(MPS[i], (1, -1, -2), Z, (1, -3))
+    inter = tensorcontract(mps[i], (1, -1, -2), Z, (1, -3))
     E = tensorcontract(inter, (1, 2, 3), D, (3, 2, 1))
-    return E[]
+    return E[], mps
 end
 
 #on fait les données et on trace
 gr()
 
-Betalist = [i for i in 0.2:0.1:1]
+Betalist = [i for i in 0.1:0.1:10]
 MPSlist = [ising2D2(N, D ,d, J ,h, Betalist[i], n, dmax, sum, cutoff) for i in eachindex(Betalist)]
 Elist = [energyIsing(MPSlist[j], J, i) for j in eachindex(MPSlist)]
 Eexact = [ExactEnergy(Betalist[i])[1] for i in eachindex(Betalist)]
 
-plot(Betalist, Elist, label="E = f(\$\\beta\$)", xlabel="\$\\beta\$", ylabel="E")
-plot!(Betalist, Eexact, label="Energie libre exacte Ising model 2D", xlabel="\$\\beta\$", ylabel="Energie")
+#plot(Betalist, Elist, label="E = f(\$\\beta\$)", xlabel="\$\\beta\$", ylabel="E")
+#plot!(Betalist, Eexact, label="Energie libre exacte Ising model 2D", xlabel="\$\\beta\$", ylabel="Energie")
 
+Mps = MPS(N,d, D)
+e1 = energyIsing(deepcopy(Mps), J, i)
+e2 = energyIsing(deepcopy(Mps), J, i)
 
+@show e1, e2
