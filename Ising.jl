@@ -3,11 +3,19 @@ using LinearAlgebra
 using TensorOperations
 using Plots
 using HCubature
+using SpecialFunctions
 
-function ExactEnergy(b)
+function ExactEnergylibre(b)
     f(x) = -(log(2) + log(cosh(2*b*J)^2) - sinh(2*b*J)*(cos(x[1]) + cos(x[2]))/(8*pi))/b
     val, err = hcubature(f, [0, 0], [2*pi, 2*pi])
     return val, err
+end
+
+function ExactEnergy(beta)
+    k = 1/(sinh(2*beta)^2)
+    k_modulus = 4*k/(1+k)^2
+    K = ellipk(k_modulus)
+    return -(1+2/pi * (2*tanh(2*beta)^2 -1)*K)/tanh(2*beta)
 end
 
 J = 1.0
@@ -193,7 +201,7 @@ function energyIsing(mps, J, i)#mettre un ! au debut du nom de la fonction pour 
     @show N
     inter = tensorcontract(mps[i], (1, -1, -2), Z, (1, -3))
     E = tensorcontract(inter, (1, 2, 3), D, (3, 2, 1))
-    return E[], mps
+    return E[] #mps
 end
 
 #on fait les données et on trace
@@ -204,11 +212,14 @@ MPSlist = [ising2D2(N, D ,d, J ,h, Betalist[i], n, dmax, sum, cutoff) for i in e
 Elist = [energyIsing(MPSlist[j], J, i) for j in eachindex(MPSlist)]
 Eexact = [ExactEnergy(Betalist[i])[1] for i in eachindex(Betalist)]
 
-#plot(Betalist, Elist, label="E = f(\$\\beta\$)", xlabel="\$\\beta\$", ylabel="E")
-#plot!(Betalist, Eexact, label="Energie libre exacte Ising model 2D", xlabel="\$\\beta\$", ylabel="Energie")
-
+#display(current())
 Mps = MPS(N,d, D)
 e1 = energyIsing(deepcopy(Mps), J, i)
 e2 = energyIsing(deepcopy(Mps), J, i)
 
 @show e1, e2
+
+plot(Betalist, Elist, label="E = f(\$\\beta\$)", xlabel="\$\\beta\$", ylabel="E")
+plot!(Betalist, Eexact, label="Energie libre exacte Ising model 2D", xlabel="\$\\beta\$", ylabel="Energie")
+
+#en julia on met les lignes de plot soit à la toute fin du code soit on ajoute un display(current())
