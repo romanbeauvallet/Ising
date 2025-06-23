@@ -198,25 +198,17 @@ function energyIsing(mps, J, i_meas)#mettre un ! au debut du nom de la fonction 
     return E
 end
 
-#on fait les données et on trace
-gr()
+
 
 site_measure = N ÷ 2
-#Betalist = collect(0.1:0.1:10)
-Betalist = [0.1, 0.2]
+Betalist = collect(0.1:0.1:2)
+#Betalist = [0.1, 0.2]
 Eexact = ExactEnergy.(Betalist)
 
 MPSlist = map(β -> ising2D(N, D0, d, J, h, β, 100, Dmax, rejected_weight, cutoff), Betalist);
 Elist = map(mps -> energyIsing(mps, J, site_measure), MPSlist)
 
-#plot(Betalist, Elist, label="TEBD", xlabel="\$\\beta\$", ylabel="Energy")
-#plot!(Betalist, Eexact, label="exact")
-
-#en julia on met les lignes de plot soit à la toute fin du code soit on ajoute un display(current())
-println.(Betalist .=> Elist)
-
-N = 20
-β = 0.1
-niter = 100
-mps = ising2D(N, D0, d, J, h, β, niter, Dmax, rejected_weight, cutoff);
-println(nothing)
+#on fait les données et on trace
+gr()
+plot(Betalist, -2*Elist, label="TEBD", xlabel="\$\\beta\$", ylabel="Energy")
+plot!(Betalist, Eexact, label="exact")
