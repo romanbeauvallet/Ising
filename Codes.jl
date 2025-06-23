@@ -3,7 +3,7 @@
 ##Librairies
 using LinearAlgebra
 using ITensors
-using TensorCast
+#using TensorCast
 using TensorOperations
 
 ##Constants
@@ -15,7 +15,7 @@ sz = [1 0; 0 -1] # Pauli Z matrix
 
 
 
-Bell = Dict{String, Matrix{Float64}}()
+Bell = Dict{String,Matrix{Float64}}()
 n = sqrt(2) # normalization factor
 Bell["00"] = [1/n 0; 0 1/n] # |00>
 Bell["01"] = [1/n 0; 0 -1/n] # |01>
@@ -25,39 +25,39 @@ Bell["11"] = [0 -1/n; 0 1/n] # |11>
 ##Functions
 
 function MPSv(N::Int64, d::Int64, D::Int64)
-    Mat = Dict{String,Array{Float64, 3}}()
-    Mat["1"] = rand(d,1,D)
+    Mat = Dict{String,Array{Float64,3}}()
+    Mat["1"] = rand(d, 1, D)
     for i in 2:N-1
-        Mat["$i"] = rand(d,D,D)
+        Mat["$i"] = rand(d, D, D)
     end
-    Mat["$N"] = rand(d,1,D)
+    Mat["$N"] = rand(d, 1, D)
     return Mat
-end 
+end
 
 #dictionary version of MPS leads to a stack overflow error
 
-function MPS(N::Int64, d::Int64, D::Int64)
-    mps = Vector{Array{Float64, 3}}(undef, N)
-    mps[1] = randn(d,1,D)
+function init_random_mps(N::Int64, d::Int64, D::Int64)
+    MPS = Vector{Array{Float64,3}}(undef, N)
+    MPS[1] = randn(d, 1, D)
     for i in 2:N-1
-        mps[i] = randn(d,D,D)
+        MPS[i] = randn(d, D, D)
     end
-    mps[N] = randn(d,D,1)
-    return mps
+    MPS[N] = randn(d, D, 1)
+    return MPS
 end
 
-    """
-    N -- number of sites 
-    d -- physical dimension
-    D -- bond dimension
-    L -- vector of fixed physical indices (length N, values in 1:d)
-    Return a random MPS of N sites with fixed physical indices, return also the contraction over the bond indices
-    """
+"""
+N -- number of sites
+d -- physical dimension
+D -- bond dimension
+L -- vector of fixed physical indices (length N, values in 1:d)
+Return a random MPS of N sites with fixed physical indices, return also the contraction over the bond indices
+"""
 function fixedMPS(N::Int64, d::Int64, D::Int64, L::Vector{Int64})
     if length(L) != d
         error("Length of L must be equal to d")
     end
-    Mat = Dict{String, Matrix}()
+    Mat = Dict{String,Matrix}()
     Mat["1"] = randn(1, d, D)
     for i in 2:N-1
         Mat["$i"] = randn(D, d, D)
@@ -71,40 +71,40 @@ function fixedMPS(N::Int64, d::Int64, D::Int64, L::Vector{Int64})
     return psi, Mat
 end
 
-    """
-    N -- number of sites 
-    d -- physical dimension
-    D -- bond dimension
-    a -- dimension of the ancilla states
-    Return a random MPS of N sites with an ancilla state of dimension a, return also the contraction over the bond indices
-    """
+"""
+N -- number of sites
+d -- physical dimension
+D -- bond dimension
+a -- dimension of the ancilla states
+Return a random MPS of N sites with an ancilla state of dimension a, return also the contraction over the bond indices
+"""
 function AncillaDic(N::Int64, d::Int64, D::Int64, a::Int64)
-    Mat = Dict{String,Array{Float64, 4}}()
-    Mat["1"] = rand(a,d,1,D)
+    Mat = Dict{String,Array{Float64,4}}()
+    Mat["1"] = rand(a, d, 1, D)
     for i in 2:N-1
-        Mat["$i"] = rand(a,d,D,D)
+        Mat["$i"] = rand(a, d, D, D)
     end
-    Mat["$N"] = rand(a,d,1,D)
+    Mat["$N"] = rand(a, d, 1, D)
     return Mat
 end
 
 function Ancilla(N::Int64, d::Int64, D::Int64, a::Int64)
     Mat = Vector{Array{}}(undef, N)
-    Mat[1] = rand(a,d,1,D)
+    Mat[1] = rand(a, d, 1, D)
     for i in 2:N-1
-        Mat[i] = rand(a,d,D,D)
+        Mat[i] = rand(a, d, D, D)
     end
-    Mat[N] = rand(a,d,D,1)
+    Mat[N] = rand(a, d, D, 1)
     return Mat
 end
 
-    """
-    N -- number of sites 
-    d -- physical dimension
-    D -- bond dimension
-    a -- dimension of the ancilla states
-    Return a random MPS of N sites with an ancilla state of dimension a
-    """
+"""
+N -- number of sites
+d -- physical dimension
+D -- bond dimension
+a -- dimension of the ancilla states
+Return a random MPS of N sites with an ancilla state of dimension a
+"""
 function AncillaBell(N::Int64, key::String; D::Int64=1, d::Int64=2, a::Int64=2)
     Mat = Vector{Array{}}(undef, N)
     for i in 1:N
@@ -113,22 +113,22 @@ function AncillaBell(N::Int64, key::String; D::Int64=1, d::Int64=2, a::Int64=2)
     return Mat
 end
 
-function normalizeDic(M::Dict{String, Array{Float64, 3}})
+function normalizeDic(M::Dict{String,Array{Float64,3}})
     """
     Normalize the MPS represented by the dictionary M
     """
     N = length(M)
-    C = contract(conj(M["1"]), (1,2,-1), M["1"], (1,2,-2))
+    C = contract(conj(M["1"]), (1, 2, -1), M["1"], (1, 2, -2))
     for i in 2:N-1
-        C = contract(C, (1,2), conj(M["$i"]),(3,2,-1), M["$i"], (3,1,-2))
+        C = contract(C, (1, 2), conj(M["$i"]), (3, 2, -1), M["$i"], (3, 1, -2))
     end
-    C = contract(C, (1,2), conj(M["$N"]), (3,2,4), M["$N"], (3,1,4))
+    C = contract(C, (1, 2), conj(M["$N"]), (3, 2, 4), M["$N"], (3, 1, 4))
 end
 
 """
 return the dagger of the MPS represented by the array M, be aware of the original indices indexing
 """
-function dagger(M::Vector{Array{Float64, 3}})
+function dagger(M::Vector{Array{Float64,3}})
     m = length(M)
     Mbis = Vector{eltype(M)}(undef, m)
     for i in 1:m
@@ -137,47 +137,47 @@ function dagger(M::Vector{Array{Float64, 3}})
     end
     #@show typeof(Mbis[i])
     return Mbis
-end 
+end
 
-    """
-    Normalize the MPS represented by the array M
-    """
+"""
+Normalize the MPS represented by the array M
+"""
 function normalize(M::Vector{Array{}})
     N = length(M)
     G = dagger(M)
-    C = tensorcontract(G[1], [1,-1,2], M[1], [1,2,-2])
-    println("size C", size(C))
-    for i in 2:N-1  
-        x = tensorcontract(G[i],[3,-1,-2], M[i], [3,-3,-4])
-        println("size x", size(x))
-        C = tensorcontract(C, [1,2], x, [-1,1,2,-2])
+    C = tensorcontract(G[1], [1, -1, 2], M[1], [1, 2, -2])
+    #println("size C", size(C))
+    for i in 2:N-1
+        x = tensorcontract(G[i], [3, -1, -2], M[i], [3, -3, -4])
+        #println("size x", size(x))
+        C = tensorcontract(C, [1, 2], x, [-1, 1, 2, -2])
         #println("norme partielle", norm(C))
     end
-    p = tensorcontract(G[N], [1,2,-1], M[N], [1,-2,2])
-    C = tensorcontract(C, [1,2], p, [1,2])
+    p = tensorcontract(G[N], [1, 2, -1], M[N], [1, -2, 2])
+    C = tensorcontract(C, [1, 2], p, [1, 2])
     return C[]
 end
 
-    """
-    M1, M2 -- dictionaries of matrices representing MPS (no Bell states othewise its pointless)
-    L -- list of physical indices
+"""
+M1, M2 -- dictionaries of matrices representing MPS (no Bell states othewise its pointless)
+L -- list of physical indices
 
 
-    each paired of matrices in M1 and M2 must have the same physical indice dimension
-    Return the contraction of the MPS
-    """
-function contraction(M1::Dict{String, Matrix}, M2::Dict{String, Matrix}, L::Vector{Int64})
-    m,n = length(M1), length(M2)
+each paired of matrices in M1 and M2 must have the same physical indice dimension
+Return the contraction of the MPS
+"""
+function contraction(M1::Dict{String,Matrix}, M2::Dict{String,Matrix}, L::Vector{Int64})
+    m, n = length(M1), length(M2)
     if m != n
         error("The number of matrices in M1 and M2 must be the same.")
     end
     C = localcontract(M1["1"], M2["1"])
-    c = reshape(C, size(C,1)^2, size(C,2)^2, size(C,3)^2)
+    c = reshape(C, size(C, 1)^2, size(C, 2)^2, size(C, 3)^2)
     for i in 2:m
         key = string(i)
-        @tensor R[i,j,k,l,m,n] = M1[key][i,v,j,k] * M2[key][l,v,m,n]
-        r = reshape(R, size(R,1)^2, size(R,2)^2, size(R,3)^2)
-        @tensor c[a,b,c] = c[] * r[i,j,k,l,m,n]
+        @tensor R[i, j, k, l, m, n] = M1[key][i, v, j, k] * M2[key][l, v, m, n]
+        r = reshape(R, size(R, 1)^2, size(R, 2)^2, size(R, 3)^2)
+        @tensor c[a, b, c] = c[] * r[i, j, k, l, m, n]
     end
     return result
 end
@@ -188,11 +188,11 @@ return the Trotter-Suzuki decomposition of the matrix M with time step dt
 
 """
 function TrotterSuzukiSpinchain(dt::Float64, N::Int, J::Complex=1.0, h=1.0)
-    localhamiltonian = J*(kron(sx, sx) + kron(sy, sy) + kron(sz, sz))
-    Me = Vector{Array{}}(undef, N//2)
-    Mo = Vector{Array{}}(undef, N//2)
-    G = exp(-dt*localhamiltonian)
-    g = reshape(G, (2,2,2,2))
+    localhamiltonian = J * (kron(sx, sx) + kron(sy, sy) + kron(sz, sz))
+    Me = Vector{Array{}}(undef, N // 2)
+    Mo = Vector{Array{}}(undef, N // 2)
+    G = exp(-dt * localhamiltonian)
+    g = reshape(G, (2, 2, 2, 2))
     for i in 2:2:N
         push!(Me, g)
     end
@@ -205,11 +205,11 @@ end
 trotter suzuki for ising model
 """
 function TrotterSuzukiIsing(dt::Float64, N::Int, J::Complex=1.0, h=0.0)
-    localhamiltonian = J*(kron(sz, sz)) - h*kron(sx, I) # Ising model Hamiltonian
+    localhamiltonian = J * (kron(sz, sz)) - h * kron(sx, I) # Ising model Hamiltonian
     Me = Vector{Array{}}()
     Mo = Vector{Array{}}()
-    G = exp(-dt*localhamiltonian)
-    g = reshape(G, (2,2,2,2))
+    G = exp(-dt * localhamiltonian)
+    g = reshape(G, (2, 2, 2, 2))
     for i in 2:2:N
         push!(Me, g)
     end
@@ -226,10 +226,10 @@ dmax is the maximum bond dimension
 cutoff is the threshold for truncation, every value under cutoff are erased
 
 """
-function tronquer!(A, B, C, dmax, cutoff, sum)
+function tronquer(A, B, C, Dmax, cutoff, rejected_weight)
     #cutoff
     #@show B
-    cuteff = norm(B)*cutoff
+    cuteff = norm(B) * cutoff
     p = maximum(findall(x -> x > cuteff, B))
     #@show p
     K = B[1:p] #S est ordonné dans l'ordre décroissant, on enlève les valeurs sous le cutoff
@@ -237,41 +237,15 @@ function tronquer!(A, B, C, dmax, cutoff, sum)
     #poids rejeté
     s = 0
     i = n
-    while s < sum && i > 1
+    while s < rejected_weight && i > 1
         s += K[i]
         i -= 1
     end
-    #@show i 
-    q = minimum([dmax, i+1]) #on tronque à dmax ou à i avec i+1 car boucle while 
+    #@show i
+    q = minimum([Dmax, i + 1]) #on tronque à Dmax ou à i avec i+1 car boucle while
     K = K[1:q]
     #@show q
     return A[:, 1:q], K, C[:, 1:q] #attention on utilise C' donc on cut les colonnes de C
-end
-"""
-1. contraction : left and right doivent etre dans la bonne jauge (canonique)
-2. SVD
-3.tronquer
-4.return the new MPS
-"""
-function tebd(left,right,gate,dmax, cutoff, sum, side::String) #(physique, gauche, droite)
-    #1 contraction left and right
-    Mps = tensorcontract(left, (-1,-2,1), right,(-3,1,-4)) #(physique, gauche, physique, droite)
-    #2 contraction with the gate
-    T = tensorcontract(Mps, (1,-1,2,-2), gate, (1,2,-3,-4)) #(gauche, droite, bas, bas)
-    T = permutedims(T, (1, 3, 2, 4)) # permute the axes to match the SVD operation
-    println("size T", size(T))
-    #3 SVD
-    U, S, V = svd(reshape(T, (size(T, 1)*size(T, 2)), (size(T, 3)*size(T, 4))))
-    if side == "right"
-        A, B, C = U, S, V#tronquer(U, S, V, dmax, cutoff, sum)
-        return reshape(A, size(gate, 3), size(left, 2), size(A, 2)), reshape(Diagonal(B)*C', size(gate, 4), length(B), size(right, 3))
-    elseif side == "left"
-        #tronquer
-        A, B, C = U, S, V#tronquer(U, S, V, dmax, cutoff, sum)
-        return reshape(A*Diagonal(B), size(gate, 3), size(left, 2), length(B)), reshape(C', size(gate, 4), size(C, 1), size(right, 3))
-    else
-        error("side must be 'left' or 'right'")
-    end
 end
 """
 MPS -- a matrix product state represented as a vector of tensors
@@ -279,8 +253,8 @@ return the left canonical form of this tensor
 """
 function canonicalleft!(mps) #(physique, gauche, droite)
     n = length(mps)
-    mPS_canonical = Vector{eltype(MPS)}(undef, n)
-    leftcenter = Vector{eltype(MPS)}(undef, n)
+    mPS_canonical = Vector{eltype(mps)}(undef, n)
+    leftcenter = Vector{eltype(mps)}(undef, n)
     leftcenter[1] = mps[1] # first tensor remains unchanged
     for i in 1:n-1
         (d, D, h) = size(mps[i]) # get the physical and bond dimensions
@@ -301,10 +275,10 @@ end
 """
 return the right canonical form of this tensor
 """
-function canonicalright!(mps) #(physique, gauche, droite) 
+function canonicalright!(mps) #(physique, gauche, droite)
     n = length(mps)
-    mPS_canonical = Vector{eltype(MPS)}(undef, n)#pas initialisé comme ça
-    rightcenter = Vector{eltype(MPS)}(undef, n)
+    mPS_canonical = Vector{eltype(mps)}(undef, n)#pas initialisé comme ça
+    rightcenter = Vector{eltype(mps)}(undef, n)
     rightcenter[n] = mps[n] # last tensor remains unchanged
     for i in n:-1:2
         (d, D, h) = size(mps[i])
@@ -322,7 +296,7 @@ function canonicalright!(mps) #(physique, gauche, droite)
 end
 
 """
-vérifie si les MPS sont dans la forme canonique en contractant les deux mps 
+vérifie si les MPS sont dans la forme canonique en contractant les deux mps
 en pratique on prend mps2 = dagger mps1
 les deux mps doivent être dans la même jauge et être deja canonique
 """
@@ -335,11 +309,11 @@ function contractcanon(Mps1, Mps2, side, boundary)
         if boundary >= n
             error("boundary must be less than n")
         end
-        if n>1
-            C = tensorcontract(Mps1[1], (1,2,-1), Mps2[1], (1,-2,2))
+        if n > 1
+            C = tensorcontract(Mps1[1], (1, 2, -1), Mps2[1], (1, -2, 2))
             for i in 2:boundary
-                x = tensorcontract(Mps1[i], (3,-1,-2), Mps2[i], (3,-3,-4))
-                C = tensorcontract(C, (1,2), x, (1,-1,-2,2))
+                x = tensorcontract(Mps1[i], (3, -1, -2), Mps2[i], (3, -3, -4))
+                C = tensorcontract(C, (1, 2), x, (1, -1, -2, 2))
             end
             return C, size(C)
         end
@@ -347,11 +321,11 @@ function contractcanon(Mps1, Mps2, side, boundary)
         if boundary <= 1
             error("boundary must be greater than 1")
         end
-        if n>1
-            C = tensorcontract(Mps1[n], (1,-1,2), Mps2[n], (1,2,-2))
+        if n > 1
+            C = tensorcontract(Mps1[n], (1, -1, 2), Mps2[n], (1, 2, -2))
             for i in n-1:-1:boundary
-                x = tensorcontract(Mps1[i], (1,-1,-2), Mps2[i], (1,-3,-4))
-                C = tensorcontract(C, (1,2), x, (-1,1,2,-2))
+                x = tensorcontract(Mps1[i], (1, -1, -2), Mps2[i], (1, -3, -4))
+                C = tensorcontract(C, (1, 2), x, (-1, 1, 2, -2))
             end
             return C, size(C)
         end
@@ -368,34 +342,40 @@ return the new mps after a sweep of tebd on tow gates
 tensor type = (physical, left, right)
 gate type = (up left, up right, down left, down right)
 """
-function tebd2(left, right, gate, side::String, dmax, cutoff, sum)
-    if size(left, 1) != size(gate, 1) || size(right, 1) != size(gate, 2)
+function tebd_step(left, right, gate, side::String, Dmax, cutoff, rejected_weight)
+    Dleft = size(left, 2)
+    Dright = size(right, 3)
+    dleft = size(left, 1)
+    dright = size(right, 1)
+
+    if dleft != size(gate, 1) || dright != size(gate, 2)
         error("The dimensions of the tensors do not match.")
-    elseif size(left,3) != size(right, 2)
+    elseif size(left, 3) != size(right, 2)
         error("The bond dimensions of the tensors do not match.")
     end
-    MPS = tensorcontract(left, (-1,-2,1), right,(-3,1,-4)) #(physique, gauche, physique, droite)
-    T = tensorcontract(MPS, (1,-1,2,-2), gate, (1,2,-3,-4)) #T type = (gauche haut, droite haut, bas gauche, bas droite)
+    @assert dleft == size(gate, 3)
+    @assert dright == size(gate, 4)
+
+    mid = tensorcontract((-1, -2, -3, -4), left, (-1, -2, 1), right, (-3, 1, -4)) #(physique, gauche, physique, droite)
+    t = tensorcontract((-3, -1, -4, -2), mid, (1, -1, 2, -2), gate, (1, 2, -3, -4)) #T type = (gauche haut, droite haut, bas gauche, bas droite)
+    @assert size(t) == (dleft, Dleft, dright, Dright)
+    m = reshape(t, dleft * Dleft, dright * Dright)
+    R, Y, Q = svd(m)
+    U, S, V = tronquer(R, Y, Q, Dmax, cutoff, rejected_weight) #troncation step
+    newDmid = length(S)
+    normalize!(S) #normalisation step
     #on fait la svd pour le nouveau mps
     if side == "right"
-        T = permutedims(T, (1, 3, 2, 4)) # permute the axes to match the SVD operation (up left, down left, up right, down right)
-        R, Y, Q = svd(reshape(T, (size(T, 1)*size(T, 2)), (size(T, 3)*size(T, 4))))
-        U, S, V = tronquer!(R, Y, Q, dmax, cutoff, sum) #troncation step
-        S = S/norm(S) #normalisation step
-        A = reshape(U, size(gate,3), size(left,2), size(U,2)) #(physical, left, bond)
-        B = reshape(Diagonal(S) * V',length(S), size(right, 3), size(gate, 4)) 
-        B = permutedims(B, (3, 1, 2))
-        return A, B
+        A0 = U
+        B0 = Diagonal(S) * V'
     elseif side == "left"
-        T = permutedims(T, (1, 3, 2, 4)) # permute the axes to match the SVD operation
-        R, Y, Q = svd(reshape(T, (size(T, 1)*size(T, 2)), (size(T, 3)*size(T, 4))))
-        U, S, V = tronquer!(R, Y, Q, dmax, cutoff, sum)
-        S = S/norm(S)
-        A = reshape(U * Diagonal(S), size(gate, 3), size(left, 2), length(S))
-        B = reshape(V', length(S), size(gate, 4), size(right, 3))
-        B = permutedims(B, (2, 1, 3))
-        return A, B
+        A0 = U * Diagonal(S)
+        B0 = V'
     else
         error("side must be 'left' or 'right'")
     end
+    A = reshape(A0, dleft, Dleft, newDmid) #(physical, left, bond)
+    B = reshape(B0, newDmid, dright, Dright)
+    B = permutedims(B, (2, 1, 3))
+    return A, B
 end
