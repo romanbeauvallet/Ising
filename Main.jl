@@ -3,7 +3,7 @@
 ##Librairies
 using LinearAlgebra
 using ITensors
-using TensorCast
+#using TensorCast
 using TensorOperations
 using Dates
 
@@ -19,6 +19,6 @@ function main()
     println("canonical form", canonicalright(Mps))
 end
 
-#fonction normalize ne marche pas car résultat différent de norm(Mps), surement à cause des axes il faut prendre le vrai dagger donc permutter les axes aussi 
+#fonction normalize ne marche pas car résultat différent de norm(Mps), surement à cause des axes il faut prendre le vrai dagger donc permutter les axes aussi
 
 main()

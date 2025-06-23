@@ -3,7 +3,7 @@
 ##Librairies
 using LinearAlgebra
 using ITensors
-using TensorCast
+#using TensorCast
 using TensorOperations
 
 ##Constants
@@ -32,11 +32,11 @@ function MPSv(N::Int64, d::Int64, D::Int64)
     end
     Mat["$N"] = rand(d,1,D)
     return Mat
-end 
+end
 
 #dictionary version of MPS leads to a stack overflow error
 
-function MPS(N::Int64, d::Int64, D::Int64)
+function init_random_mps(N::Int64, d::Int64, D::Int64)
     MPS = Vector{Array{Float64, 3}}(undef, N)
     MPS[1] = randn(d,1,D)
     for i in 2:N-1
@@ -47,7 +47,7 @@ function MPS(N::Int64, d::Int64, D::Int64)
 end
 
     """
-    N -- number of sites 
+    N -- number of sites
     d -- physical dimension
     D -- bond dimension
     L -- vector of fixed physical indices (length N, values in 1:d)
@@ -72,7 +72,7 @@ function fixedMPS(N::Int64, d::Int64, D::Int64, L::Vector{Int64})
 end
 
     """
-    N -- number of sites 
+    N -- number of sites
     d -- physical dimension
     D -- bond dimension
     a -- dimension of the ancilla states
@@ -99,7 +99,7 @@ function Ancilla(N::Int64, d::Int64, D::Int64, a::Int64)
 end
 
     """
-    N -- number of sites 
+    N -- number of sites
     d -- physical dimension
     D -- bond dimension
     a -- dimension of the ancilla states
@@ -137,7 +137,7 @@ function dagger(M::Vector{Array{Float64, 3}})
     end
     #@show typeof(Mbis[i])
     return Mbis
-end 
+end
 
     """
     Normalize the MPS represented by the array M
@@ -147,7 +147,7 @@ function normalize(M::Vector{Array{}})
     G = dagger(M)
     C = tensorcontract(G[1], [1,-1,2], M[1], [1,2,-2])
     println("size C", size(C))
-    for i in 2:N-1  
+    for i in 2:N-1
         x = tensorcontract(G[i],[3,-1,-2], M[i], [3,-3,-4])
         println("size x", size(x))
         C = tensorcontract(C, [1,2], x, [-1,1,2,-2])
@@ -226,7 +226,7 @@ Dmax is the maximum bond dimension
 cutoff is the threshold for truncation, every value under cutoff are erased
 
 """
-function tronquer(A, B, C, Dmax, cutoff, sum)
+function tronquer(A, B, C, Dmax, cutoff, rejected_weight)
     #cutoff
     #@show B
     cuteff = norm(B)*cutoff
@@ -237,12 +237,12 @@ function tronquer(A, B, C, Dmax, cutoff, sum)
     #poids rejeté
     s = 0
     i = n
-    while s < sum && i > 1
+    while s < rejected_weight && i > 1
         s += K[i]
         i -= 1
     end
-    #@show i 
-    q = minimum([Dmax, i+1]) #on tronque à Dmax ou à i avec i+1 car boucle while 
+    #@show i
+    q = minimum([Dmax, i+1]) #on tronque à Dmax ou à i avec i+1 car boucle while
     K = K[1:q]
     #@show q
     return A[:, 1:q], K, C[:, 1:q] #attention on utilise C' donc on cut les colonnes de C
@@ -253,7 +253,7 @@ end
 3.tronquer
 4.return the new MPS
 """
-function tebd(left,right,gate,Dmax, cutoff, sum, side::String) #(physique, gauche, droite)
+function tebd(left,right,gate,Dmax, cutoff, rejected_weight, side::String) #(physique, gauche, droite)
     #1 contraction left and right
     Mps = tensorcontract(left, (-1,-2,1), right,(-3,1,-4)) #(physique, gauche, physique, droite)
     #2 contraction with the gate
@@ -263,11 +263,11 @@ function tebd(left,right,gate,Dmax, cutoff, sum, side::String) #(physique, gauch
     #3 SVD
     U, S, V = svd(reshape(T, (size(T, 1)*size(T, 2)), (size(T, 3)*size(T, 4))))
     if side == "right"
-        A, B, C = U, S, V#tronquer(U, S, V, Dmax, cutoff, sum)
+        A, B, C = U, S, V#tronquer(U, S, V, Dmax, cutoff, rejected_weight)
         return reshape(A, size(gate, 3), size(left, 2), size(A, 2)), reshape(Diagonal(B)*C', size(gate, 4), length(B), size(right, 3))
     elseif side == "left"
         #tronquer
-        A, B, C = U, S, V#tronquer(U, S, V, Dmax, cutoff, sum)
+        A, B, C = U, S, V#tronquer(U, S, V, Dmax, cutoff, rejected_weight)
         return reshape(A*Diagonal(B), size(gate, 3), size(left, 2), length(B)), reshape(C', size(gate, 4), size(C, 1), size(right, 3))
     else
         error("side must be 'left' or 'right'")
@@ -301,7 +301,7 @@ end
 """
 return the right canonical form of this tensor
 """
-function canonicalright(MPS) #(physique, gauche, droite) 
+function canonicalright(MPS) #(physique, gauche, droite)
     n = length(MPS)
     MPS_canonical = Vector{eltype(MPS)}(undef, n)#pas initialisé comme ça
     Rightcenter = Vector{eltype(MPS)}(undef, n)
@@ -322,7 +322,7 @@ function canonicalright(MPS) #(physique, gauche, droite)
 end
 
 """
-vérifie si les MPS sont dans la forme canonique en contractant les deux mps 
+vérifie si les MPS sont dans la forme canonique en contractant les deux mps
 en pratique on prend mps2 = dagger mps1
 les deux mps doivent être dans la même jauge et être deja canonique
 """
@@ -368,7 +368,7 @@ return the new mps after a sweep of tebd on tow gates
 tensor type = (physical, left, right)
 gate type = (up left, up right, down left, down right)
 """
-function tebd2(left, right, gate, side::String, Dmax, cutoff, sum)
+function tebd2(left, right, gate, side::String, Dmax, cutoff, rejected_weight)
     if size(left, 1) != size(gate, 1) || size(right, 1) != size(gate, 2)
         error("The dimensions of the tensors do not match.")
     elseif size(left,3) != size(right, 2)
@@ -380,16 +380,16 @@ function tebd2(left, right, gate, side::String, Dmax, cutoff, sum)
     if side == "right"
         T = permutedims(T, (1, 3, 2, 4)) # permute the axes to match the SVD operation (up left, down left, up right, down right)
         R, Y, Q = svd(reshape(T, (size(T, 1)*size(T, 2)), (size(T, 3)*size(T, 4))))
-        U, S, V = tronquer(R, Y, Q, Dmax, cutoff, sum) #troncation step
+        U, S, V = tronquer(R, Y, Q, Dmax, cutoff, rejected_weight) #troncation step
         S = S/norm(S) #normalisation step
         A = reshape(U, size(gate,3), size(left,2), size(U,2)) #(physical, left, bond)
-        B = reshape(Diagonal(S) * V',length(S), size(right, 3), size(gate, 4)) 
+        B = reshape(Diagonal(S) * V',length(S), size(right, 3), size(gate, 4))
         B = permutedims(B, (3, 1, 2))
         return A, B
     elseif side == "left"
         T = permutedims(T, (1, 3, 2, 4)) # permute the axes to match the SVD operation
         R, Y, Q = svd(reshape(T, (size(T, 1)*size(T, 2)), (size(T, 3)*size(T, 4))))
-        U, S, V = tronquer(R, Y, Q, Dmax, cutoff, sum)
+        U, S, V = tronquer(R, Y, Q, Dmax, cutoff, rejected_weight)
         S = S/norm(S)
         A = reshape(U * Diagonal(S), size(gate, 3), size(left, 2), length(S))
         B = reshape(V', length(S), size(gate, 4), size(right, 3))
