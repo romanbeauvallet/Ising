@@ -5,13 +5,13 @@ using Plots
 using HCubature
 using SpecialFunctions
 
-function ExactEnergylibre(b)
+function exactenergylibre(b)
     f(x) = -(log(2) + log(cosh(2 * b * J)^2) - sinh(2 * b * J) * (cos(x[1]) + cos(x[2])) / (8 * pi)) / b
     val, err = hcubature(f, [0, 0], [2 * pi, 2 * pi])
     return val, err
 end
 
-function ExactEnergy(beta)
+function exactenergy(beta)
     k = 1 / (sinh(2 * beta)^2)
     k_modulus = 4 * k / (1 + k)^2
     K = ellipk(k_modulus)
@@ -32,14 +32,14 @@ rejected_weight = 1e-20
 include("Codes.jl")
 # Ising model in 2D with open boundary conditions
 
-function isingMatrix(beta, J, h=0)
+function isingMatrix(beta, J, h=0) #signe doit etre cohérent avec la convention du tenseur de l'énergie
     # Create the Ising matrix for a single site
     M = exp(beta*J)*LinearAlgebra.I(2) # Identity matrix
     return M + exp(-beta*J)*[0 1; 1 0] + h*[1 0; 0 -1]
 end
 
 function energytensor(j)
-    return [j -j ; -j j]
+    return [-j j ; j -j]
 end
 function isingTensor(beta, j, h)
     D = zeros(Int, 2, 2, 2, 2)
@@ -161,14 +161,14 @@ end
 
 
 site_measure = N ÷ 2
-Betalist = collect(0.1:0.1:2)
+Betalist = collect(0.01:0.01:1)
 #Betalist = [0.1, 0.2]
-Eexact = ExactEnergy.(Betalist)
+Eexact = exactenergy.(Betalist)
 
 MPSlist = map(β -> ising2D(N, D0, d, J, h, β, 100, Dmax, rejected_weight, cutoff), Betalist);
 Elist = map(mps -> energyIsing(mps, J, site_measure), MPSlist)
 
 #on fait les données et on trace
 gr()
-plot(Betalist, -2*Elist, label="TEBD", xlabel="\$\\beta\$", ylabel="Energy")
+plot(Betalist, 2*Elist, label="TEBD", xlabel="\$\\beta\$", ylabel="Energy")
 plot!(Betalist, Eexact, label="exact")

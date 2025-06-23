@@ -3,7 +3,6 @@
 ##Librairies
 using LinearAlgebra
 using ITensors
-#using TensorCast
 using TensorOperations
 
 ##Constants
@@ -24,20 +23,8 @@ Bell["11"] = [0 -1/n; 0 1/n] # |11>
 
 ##Functions
 
-function MPSv(N::Int64, d::Int64, D::Int64)
-    Mat = Dict{String,Array{Float64,3}}()
-    Mat["1"] = rand(d, 1, D)
-    for i in 2:N-1
-        Mat["$i"] = rand(d, D, D)
-    end
-    Mat["$N"] = rand(d, 1, D)
-    return Mat
-end
-
-#dictionary version of MPS leads to a stack overflow error
-
 function init_random_mps(N::Int64, d::Int64, D::Int64)
-    MPS = Vector{Array{Float64,3}}(undef, N)
+    MPS = Vector{Array{Complex64,3}}(undef, N)
     MPS[1] = randn(d, 1, D)
     for i in 2:N-1
         MPS[i] = randn(d, D, D)
@@ -50,45 +37,10 @@ end
 N -- number of sites
 d -- physical dimension
 D -- bond dimension
-L -- vector of fixed physical indices (length N, values in 1:d)
-Return a random MPS of N sites with fixed physical indices, return also the contraction over the bond indices
-"""
-function fixedMPS(N::Int64, d::Int64, D::Int64, L::Vector{Int64})
-    if length(L) != d
-        error("Length of L must be equal to d")
-    end
-    Mat = Dict{String,Matrix}()
-    Mat["1"] = randn(1, d, D)
-    for i in 2:N-1
-        Mat["$i"] = randn(D, d, D)
-    end
-    Mat["$N"] = randn(D, d, 1)
-    psi = Mat["1"][:, L[1], :]
-    for i in 2:N-1
-        psi = psi * Mat["$i"][:, L[i], :]
-    end
-    psi = psi * Mat["$N"][:, L[N], :]
-    return psi, Mat
-end
-
-"""
-N -- number of sites
-d -- physical dimension
-D -- bond dimension
 a -- dimension of the ancilla states
 Return a random MPS of N sites with an ancilla state of dimension a, return also the contraction over the bond indices
 """
-function AncillaDic(N::Int64, d::Int64, D::Int64, a::Int64)
-    Mat = Dict{String,Array{Float64,4}}()
-    Mat["1"] = rand(a, d, 1, D)
-    for i in 2:N-1
-        Mat["$i"] = rand(a, d, D, D)
-    end
-    Mat["$N"] = rand(a, d, 1, D)
-    return Mat
-end
-
-function Ancilla(N::Int64, d::Int64, D::Int64, a::Int64)
+function ancilla(N::Int64, d::Int64, D::Int64, a::Int64)
     Mat = Vector{Array{}}(undef, N)
     Mat[1] = rand(a, d, 1, D)
     for i in 2:N-1
@@ -105,7 +57,7 @@ D -- bond dimension
 a -- dimension of the ancilla states
 Return a random MPS of N sites with an ancilla state of dimension a
 """
-function AncillaBell(N::Int64, key::String; D::Int64=1, d::Int64=2, a::Int64=2)
+function ancillaBell(N::Int64, key::String; D::Int64=1, d::Int64=2, a::Int64=2)
     Mat = Vector{Array{}}(undef, N)
     for i in 1:N
         Mat[i] = Bell[key]
@@ -113,22 +65,10 @@ function AncillaBell(N::Int64, key::String; D::Int64=1, d::Int64=2, a::Int64=2)
     return Mat
 end
 
-function normalizeDic(M::Dict{String,Array{Float64,3}})
-    """
-    Normalize the MPS represented by the dictionary M
-    """
-    N = length(M)
-    C = contract(conj(M["1"]), (1, 2, -1), M["1"], (1, 2, -2))
-    for i in 2:N-1
-        C = contract(C, (1, 2), conj(M["$i"]), (3, 2, -1), M["$i"], (3, 1, -2))
-    end
-    C = contract(C, (1, 2), conj(M["$N"]), (3, 2, 4), M["$N"], (3, 1, 4))
-end
-
 """
 return the dagger of the MPS represented by the array M, be aware of the original indices indexing
 """
-function dagger(M::Vector{Array{Float64,3}})
+function dagger(M::Vector{Array{Complex64,3}})
     m = length(M)
     Mbis = Vector{eltype(M)}(undef, m)
     for i in 1:m
@@ -157,31 +97,6 @@ function normalize(M::Vector{Array{}})
     C = tensorcontract(C, [1, 2], p, [1, 2])
     return C[]
 end
-
-"""
-M1, M2 -- dictionaries of matrices representing MPS (no Bell states othewise its pointless)
-L -- list of physical indices
-
-
-each paired of matrices in M1 and M2 must have the same physical indice dimension
-Return the contraction of the MPS
-"""
-function contraction(M1::Dict{String,Matrix}, M2::Dict{String,Matrix}, L::Vector{Int64})
-    m, n = length(M1), length(M2)
-    if m != n
-        error("The number of matrices in M1 and M2 must be the same.")
-    end
-    C = localcontract(M1["1"], M2["1"])
-    c = reshape(C, size(C, 1)^2, size(C, 2)^2, size(C, 3)^2)
-    for i in 2:m
-        key = string(i)
-        @tensor R[i, j, k, l, m, n] = M1[key][i, v, j, k] * M2[key][l, v, m, n]
-        r = reshape(R, size(R, 1)^2, size(R, 2)^2, size(R, 3)^2)
-        @tensor c[a, b, c] = c[] * r[i, j, k, l, m, n]
-    end
-    return result
-end
-#pour la norme il suffit de prendre M2 = congugate(M1)
 
 """
 return the Trotter-Suzuki decomposition of the matrix M with time step dt
