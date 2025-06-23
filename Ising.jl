@@ -20,7 +20,8 @@ end
 
 J = 1.0
 h = 0.0
-niter = 1
+beta = 0.1
+n = 10
 N = 20 #ATTENTION N doit être pair
 d = 2
 D0 = 4
@@ -31,65 +32,24 @@ rejected_weight = 1e-20
 include("Codes.jl")
 # Ising model in 2D with open boundary conditions
 
-function isingMatrix(Beta, J, h=0)
+function isingMatrix(beta, J, h=0)
     # Create the Ising matrix for a single site
-    M = exp(Beta * J) * I # Identity matrix
-    return M + exp(-Beta * J) * [0 1; 1 0] + h * [1 0; 0 -1]
+    M = exp(beta*J)*LinearAlgebra.I(2) # Identity matrix
+    return M + exp(-beta*J)*[0 1; 1 0] + h*[1 0; 0 -1]
 end
 
-function energytensor(J)
-    return [J -J; -J J]
+function energytensor(j)
+    return [j -j ; -j j]
 end
-function isingTensor(Beta, J, h)
+function isingTensor(beta, j, h)
     D = zeros(Int, 2, 2, 2, 2)
     for i in 1:2
         D[i, i, i, i] = 1
     end
-    M = sqrt(isingMatrix(Beta, J, h))
-    @tensor T[i, j, k, l] := D[a, b, c, d] * M[i, a] * M[j, b] * M[k, c] * M[l, d]
+    M = sqrt(isingMatrix(beta, j, h))
+    @tensor T[i,j,k,l] := D[a, b, c, d] * M[i,a] * M[j,b] * M[k,c] * M[l,d]
     return T
 end
-
-#=
-"""
-N - number of sites
-d - dimension of physical indices
-D - bond dimension
-J - coupling constant
-h - external magnetic field
-Beta - inverse temperature
-n - number of sweeps
-cutoff - convergence criterion
-Dmax - maximum bond dimension
-Returns the MPS for the 2D Ising model after applying TEBD for 1 sweep
-"""
-function ising2Dunit(MPS, J::Float64, h::Float64, Beta::Float64, n, cutoff, Dmax, side, rejected_weight)
-    G = isingTensor(Beta, J, h)
-    k = length(MPS)
-    h = deepcopy(MPS) #deepcopy to avoid modifying the original MPS
-    #tout en left
-    mpsleft, leftcenter = Vector{eltype(MPS)}(undef, k), Vector{eltype(MPS)}(undef, k)
-    mpsleft, leftcenter = canonicalleft(MPS)
-    #tout en right
-    mpsright, rightcenter = Vector{eltype(MPS)}(undef, k), Vector{eltype(MPS)}(undef, k)
-    mpsright, rightcenter = canonicalright(h)
-    #new MPS
-    mpsnew = Vector{eltype(MPS)}()
-    for i in 1:2:n
-        println("verif size tensors", i, " ", size(leftcenter[i]), " ", size(rightcenter[i+1]))
-        println("porte", size(G))
-        step = tebd(leftcenter[i], rightcenter[i+1], G, Dmax, cutoff, rejected_weight, side)
-        println("debug", i, " ", step)
-        push!(mpsnew, step)
-    end
-    #canonise encore
-    mpsleft, leftcenter = canonicalleft(mpsnew)
-    mpsright, rightcenter = canonicalright(mpsnew)
-    for i in 2:2:n
-        mpsnew[i], mpsnew[i+1] = tebd(mpsleft[i], mpsright[i+1], G, Dmax, cutoff, rejected_weight, side)
-    end
-end
-=#
 
 """
 one sweep of TEBD for the 2D Ising model with a different method
@@ -101,7 +61,7 @@ function tebd_sweep(mps, gate, Dmax, rejected_weight, cutoff)
     N = length(mps)
     #%% FIRST PART ON EVEN COUPLE
     mpsnew = Vector{eltype(mps)}(undef, N)
-    right = canonicalright(mps)[1]
+    right = canonicalright!(mps)[1]
     #println.(size.(right))
     for i in 1:2:N-3 #n est even
         #@show i, i + 1
@@ -142,7 +102,7 @@ d - dimension of physical indices
 D - bond dimension
 J - coupling constant
 h - external magnetic field
-Beta - inverse temperature
+beta - inverse tempsuperature
 n - number of sweeps
 cutoff - convergence criterion
 Dmax - maximum bond dimension
@@ -163,7 +123,7 @@ end
 
 """
 MPS - mettre le MPS final avec l'évolution avec le tenseur d'Ising il est censé être en right canonical donc avec toute l'information dans le tenseur de gauche au bout
-Beta, J, h - paramètre physiques
+beta, J, h - paramètre physiques
 i - site du MPS sur lequel on calcule l'énergie
 
 return l'énergie sur le site i du MPS
@@ -182,7 +142,7 @@ function energyIsing(mps, J, i_meas)#mettre un ! au debut du nom de la fonction 
     bond_operator = energytensor(J)
     #@show size(MPS[1:i]), size(canonicalleft(MPS[1:i])[1])
     center_canonical_mps = deepcopy(mps)
-    center_canonical_mps[begin:i_meas], _ = canonicalleft(center_canonical_mps[begin:i_meas])
+    center_canonical_mps[begin:i_meas], _ = canonicalleft!(center_canonical_mps[begin:i_meas])
     #verif
     I = tensorcontract(center_canonical_mps[i_meas-1], (1, 2, -1), conj(center_canonical_mps[i_meas-1]), (1, 2, -2))
     @assert I ≈ LinearAlgebra.I(size(I, 1))

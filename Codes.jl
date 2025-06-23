@@ -222,7 +222,7 @@ end
 return le svd tronqué
 A, C -- matrices to be truncated
 B -- vector of singular values
-Dmax is the maximum bond dimension
+dmax is the maximum bond dimension
 cutoff is the threshold for truncation, every value under cutoff are erased
 
 """
@@ -247,53 +247,52 @@ function tronquer(A, B, C, Dmax, cutoff, rejected_weight)
     #@show q
     return A[:, 1:q], K, C[:, 1:q] #attention on utilise C' donc on cut les colonnes de C
 end
-
 """
 MPS -- a matrix product state represented as a vector of tensors
 return the left canonical form of this tensor
 """
-function canonicalleft(MPS) #(physique, gauche, droite)
-    n = length(MPS)
-    MPS_canonical = Vector{eltype(MPS)}(undef, n)
-    Leftcenter = Vector{eltype(MPS)}(undef, n)
-    Leftcenter[1] = MPS[1] # first tensor remains unchanged
+function canonicalleft!(mps) #(physique, gauche, droite)
+    n = length(mps)
+    mPS_canonical = Vector{eltype(mps)}(undef, n)
+    leftcenter = Vector{eltype(mps)}(undef, n)
+    leftcenter[1] = mps[1] # first tensor remains unchanged
     for i in 1:n-1
-        (d, D, h) = size(MPS[i]) # get the physical and bond dimensions
-        A = reshape(MPS[i], (d * D, h))
+        (d, D, h) = size(mps[i]) # get the physical and bond dimensions
+        A = reshape(mps[i], (d*D, h))
         U, S, V = svd(A)
         r = size(U, 2)
-        MPS_canonical[i] = reshape(U, (d, D, r))
-        q = size(MPS[i+1], 3)
-        MPS[i+1] = tensorcontract(MPS[i+1], (-1, 1, -3), Diagonal(S) * V', (-2, 1))# reshape to the original size, le reshape est obligatoire et vient de l'écriture de la contraction avec tensorcontract
-        MPS[i+1] = reshape(MPS[i+1], (d, r, q)) # reshape to the original size
-        Leftcenter[i+1] = MPS[i+1] # store the left center tensor
+        mPS_canonical[i] = reshape(U, (d, D, r))
+        q = size(mps[i+1], 3)
+        mps[i+1] =  tensorcontract(mps[i+1], (-1, 1, -3), Diagonal(S) * V', (-2,1))# reshape to the original size, le reshape est obligatoire et vient de l'écriture de la contraction avec tensorcontract
+        mps[i+1] = reshape(mps[i+1], (d, r, q)) # reshape to the original size
+        leftcenter[i+1] = mps[i+1] # store the left center tensor
     end
-    MPS_canonical[n] = MPS[n] # last tensor remains unchanged
-    Leftcenter[n] = MPS[n] # store the last tensor as the left center tensor
-    return [MPS_canonical, Leftcenter]
+    mPS_canonical[n] = mps[n] # last tensor remains unchanged
+    leftcenter[n] = mps[n] # store the last tensor as the left center tensor
+    return [mPS_canonical, leftcenter]
 end
 
 """
 return the right canonical form of this tensor
 """
-function canonicalright(MPS) #(physique, gauche, droite)
-    n = length(MPS)
-    MPS_canonical = Vector{eltype(MPS)}(undef, n)#pas initialisé comme ça
-    Rightcenter = Vector{eltype(MPS)}(undef, n)
-    Rightcenter[n] = MPS[n] # last tensor remains unchanged
+function canonicalright!(mps) #(physique, gauche, droite)
+    n = length(mps)
+    mPS_canonical = Vector{eltype(mps)}(undef, n)#pas initialisé comme ça
+    rightcenter = Vector{eltype(mps)}(undef, n)
+    rightcenter[n] = mps[n] # last tensor remains unchanged
     for i in n:-1:2
-        (d, D, h) = size(MPS[i])
-        C = permutedims(MPS[i], (2, 1, 3)) # permute the axes to match the right canonical form
-        A = reshape(C, (D, d * h))
+        (d, D, h) = size(mps[i])
+        C = permutedims(mps[i], (2, 1, 3)) # permute the axes to match the right canonical form
+        A = reshape(C, (D, d*h))
         U, S, V = svd(A)
         r = size(V', 1)
-        MPS_canonical[i] = permutedims(reshape(V', (r, d, h)), (2, 1, 3)) # reshape and permute to the original size
-        MPS[i-1] = tensorcontract(MPS[i-1], (-1, -2, 1), U * Diagonal(S), (1, -3))
-        Rightcenter[i-1] = MPS[i-1] # store the right center tensor
+        mPS_canonical[i] = permutedims(reshape(V', (r, d, h)), (2, 1, 3)) # reshape and permute to the original size
+        mps[i-1] = tensorcontract(mps[i-1], (-1, -2, 1), U * Diagonal(S), (1, -3))
+        rightcenter[i-1] = mps[i-1] # store the right center tensor
     end
-    MPS_canonical[1] = MPS[1] # first tensor remains unchanged
-    Rightcenter[1] = MPS[1] # store the first tensor as the right center tensor
-    return [MPS_canonical, Rightcenter]
+    mPS_canonical[1] = mps[1] # first tensor remains unchanged
+    rightcenter[1] = mps[1] # store the first tensor as the right center tensor
+    return [mPS_canonical, rightcenter]
 end
 
 """
