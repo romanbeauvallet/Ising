@@ -126,12 +126,12 @@ function canonicalleft!(mps) #(physique, gauche, droite)
     leftcenter[1] = mps[1] # first tensor remains unchanged
     for i in 1:n-1
         (d, D, h) = size(mps[i]) # get the physical and bond dimensions
-        A = reshape(mps[i], (d*D, h))
+        A = reshape(mps[i], (d * D, h))
         U, S, V = svd(A)
         r = size(U, 2)
         mPS_canonical[i] = reshape(U, (d, D, r))
         q = size(mps[i+1], 3)
-        mps[i+1] =  tensorcontract(mps[i+1], (-1, 1, -3), Diagonal(S) * V', (-2,1))# reshape to the original size, le reshape est obligatoire et vient de l'écriture de la contraction avec tensorcontract
+        mps[i+1] = tensorcontract(mps[i+1], (-1, 1, -3), Diagonal(S) * V', (-2, 1))# reshape to the original size, le reshape est obligatoire et vient de l'écriture de la contraction avec tensorcontract
         mps[i+1] = reshape(mps[i+1], (d, r, q)) # reshape to the original size
         leftcenter[i+1] = mps[i+1] # store the left center tensor
     end
@@ -152,7 +152,7 @@ function canonicalright!(mps) #(physique, gauche, droite)
     for i in n:-1:2
         (d, D, h) = size(mps[i])
         C = permutedims(mps[i], (2, 1, 3)) # permute the axes to match the right canonical form
-        A = reshape(C, (D, d*h))
+        A = reshape(C, (D, d * h))
         U, S, V = svd(A)
         r = size(V', 1)
         mPS_canonical[i] = permutedims(reshape(V', (r, d, h)), (2, 1, 3)) # reshape and permute to the original size
@@ -275,8 +275,8 @@ return the Boltzmann matrix (matrix with Boltzmann weight + disorder)
 """
 function isingMatrix(beta, J, h=0) #signe doit etre cohérent avec la convention du tenseur de l'énergie
     # Create the Ising matrix for a single site
-    M = exp(beta*J)*LinearAlgebra.I(2) # Identity matrix
-    return M + exp(-beta*J)*[0 1; 1 0] + h*[1 0; 0 -1]
+    M = exp(beta * J) * LinearAlgebra.I(2) # Identity matrix
+    return M + exp(-beta * J) * [0 1; 1 0] + h * [1 0; 0 -1]
 end
 
 """
@@ -284,7 +284,7 @@ j -- coupling constant
 return the energy operator
 """
 function energytensor(j)
-    return [-j j ; j -j]
+    return [-j j; j -j]
 end
 
 """
@@ -299,7 +299,7 @@ function isingTensor(beta, j, h)
         D[i, i, i, i] = 1
     end
     M = sqrt(isingMatrix(beta, j, h))
-    @tensor T[i,j,k,l] := D[a, b, c, d] * M[i,a] * M[j,b] * M[k,c] * M[l,d]
+    @tensor T[i, j, k, l] := D[a, b, c, d] * M[i, a] * M[j, b] * M[k, c] * M[l, d]
     return T
 end
 
