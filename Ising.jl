@@ -19,40 +19,29 @@ function ExactEnergy(beta)
 end
 
 function exactmagnetization(beta, j=J)
-    betacritic = log(1+sqrt(2))/(2*j)
+    betacritic = log(1 + sqrt(2)) / (2 * j)
     if beta < betacritic
         return 0
     else
-        return (1-(sinh(2*j*beta))^(-4))^(1/8)
+        return (1 - (sinh(2 * j * beta))^(-4))^(1 / 8)
     end
 end
-
-J = 1.0
-h = 0.0
-beta = 0.1
-n = 10
-N = 20 #ATTENTION N doit être pair
-d = 2
-D0 = 4
-Dmax = 100
-cutoff = 1e-12
-rejected_weight = 1e-20
 
 include("Codes.jl")
 # Ising model in 2D with open boundary conditions
 
 function isingMatrix(beta, J, h=0)
     # Create the Ising matrix for a single site
-    M = exp(beta*J)*LinearAlgebra.I(2) # Identity matrix
-    return M + exp(-beta*J)*[0 1; 1 0] + h*[1 0; 0 -1]
+    M = exp(beta * J) * LinearAlgebra.I(2) # Identity matrix
+    return M + exp(-beta * J) * [0 1; 1 0] + h * [1 0; 0 -1]
 end
 
 function isingMatrix2(beta, j, h=0)
-    M = [cosh(2*beta*j) sinh(2*beta*j); sinh(2*beta*j) cosh(2*beta*j)]
-    return exp(-2*beta*j)*M
+    M = [cosh(2 * beta * j) sinh(2 * beta * j); sinh(2 * beta * j) cosh(2 * beta * j)]
+    return exp(-2 * beta * j) * M
 end
 function energytensor(j)
-    return j*[1 -1 ; -1 1]
+    return j * [1 -1; -1 1]
 end
 function isingTensor(beta, j, h)
     D = zeros(Int, 2, 2, 2, 2)
@@ -60,7 +49,7 @@ function isingTensor(beta, j, h)
         D[i, i, i, i] = 1
     end
     M = sqrt(isingMatrix(beta, j, h))
-    @tensor T[i,j,k,l] := D[a, b, c, d] * M[i,a] * M[j,b] * M[k,c] * M[l,d]
+    @tensor T[i, j, k, l] := D[a, b, c, d] * M[i, a] * M[j, b] * M[k, c] * M[l, d]
     return T
 end
 
@@ -70,7 +59,7 @@ function isingTensor2(beta, j, h)
         D[i, i, i, i] = 1
     end
     M = sqrt(isingMatrix2(beta, j, h))
-    @tensor T[i,j,k,l] := D[a, b, c, d] * M[i,a] * M[j,b] * M[k,c] * M[l,d]
+    @tensor T[i, j, k, l] := D[a, b, c, d] * M[i, a] * M[j, b] * M[k, c] * M[l, d]
     return T
 end
 
@@ -79,7 +68,7 @@ function tensormagnetize(beta, j, h)
     D[1, 1, 1, 1] = 1
     D[2, 2, 2, 2] = -1
     M = sqrt(isingMatrix(beta, j, h))
-    @tensor T[i,j,k,l] := D[a, b, c, d] * M[i,a] * M[j,b] * M[k,c] * M[l,d]
+    @tensor T[i, j, k, l] := D[a, b, c, d] * M[i, a] * M[j, b] * M[k, c] * M[l, d]
     return T
     @show size(T)
 end
@@ -191,23 +180,32 @@ function energyIsing(mps, J, i_meas)#mettre un ! au debut du nom de la fonction 
     return E
 end
 
-function magnetizationIsing(mps, j, i_meas)
+function magnetizationIsing(mps, gate, i_meas)
     n = length(mps)
-    if !(1 < i_meas < n-1)
+    if !(1 < i_meas < n - 1)
         throw(ArgumentError("site is not in the mps"))
     end
-    bond_operator = tensormagnetize(beta, j, h)
     #@show size(MPS[1:i]), size(canonicalleft(MPS[1:i])[1])
     center_canonical_mps = deepcopy(mps)
     center_canonical_mps[begin:i_meas], _ = canonicalleft!(center_canonical_mps[begin:i_meas])
     #%% contraction
     #@show size(center_canonical_mps[i_meas])
     ket = tensorcontract((-2, -1, -3, -4), center_canonical_mps[i_meas], (-1, -2, 1), center_canonical_mps[i_meas+1], (-3, 1, -4)) #(gauche, physique, physique, droite)
-    inter0 = tensorcontract((-1, -3, -4, -2), ket, (-1, 1, 2, -2), bond_operator, (1, 2, -3, -4)) #(gauche, physique, physique, droite)
+    inter0 = tensorcontract((-1, -3, -4, -2), ket, (-1, 1, 2, -2), gate, (1, 2, -3, -4)) #(gauche, physique, physique, droite)
     bras = tensorcontract((-2, -1, -3, -4), conj(center_canonical_mps[i_meas]), (-1, -2, 1), conj(center_canonical_mps[i_meas+1]), (-3, 1, -4)) #meme format
     E = tensorcontract(inter0, (1, 2, 3, 4), bras, (1, 2, 3, 4))[]
     return E
 end
+
+J = 1.0
+h = 0.0
+n = 10
+N = 30 #ATTENTION N doit être pair
+d = 2
+D0 = 4
+Dmax = 100
+cutoff = 1e-12
+rejected_weight = 1e-20
 
 
 site_measure = N ÷ 2
@@ -216,14 +214,24 @@ Betalist = collect(0.1:0.01:2)
 Eexact = ExactEnergy.(Betalist)
 Mexact = exactmagnetization.(Betalist)
 
-MPSlist = map(β -> ising2D(N, D0, d, J, h, β, 100, Dmax, rejected_weight, cutoff), Betalist);
-Elist = map(mps -> energyIsing(mps, J, site_measure), MPSlist);
-Mlist = map(mps -> magnetizationIsing(mps, J, site_measure), MPSlist)
+Elist = Vector{Float64}()
+Mlist = Vector{Float64}()
+
+for i in eachindex(Betalist)
+    beta = Betalist[i]
+    MPS = ising2D(N, D0, d, J, h, beta, 100, Dmax, rejected_weight, cutoff)
+    bond_operator = tensormagnetize(beta, J, h)
+    M = magnetizationIsing(MPS, bond_operator, site_measure)
+    f = magnetizationIsing(MPS, isingTensor(beta, J, h), site_measure)
+    push!(Mlist, M / f)
+    @show i, beta, M, f
+end
+
 #on fait les données et on trace
 gr()
-p1 = plot(Betalist, -2*Elist, label="TEBD", xlabel="\$\\beta\$", ylabel="Energy")
-plot!(Betalist, Eexact, label="exact")
-display(p1)
+#p1 = plot(Betalist, -2*Elist, label="TEBD", xlabel="\$\\beta\$", ylabel="Energy")
+#plot!(Betalist, Eexact, label="exact")
+#display(p1)
 
 
 p2 = plot(Betalist, abs.(Mlist), label="TEBD", xlabel="\$\\beta\$", ylabel="Magnetization")
