@@ -47,6 +47,10 @@ function isingMatrix(beta, J, h=0)
     return M + exp(-beta*J)*[0 1; 1 0] + h*[1 0; 0 -1]
 end
 
+function isingMatrix2(beta, j, h=0)
+    M = [cosh(2*beta*j) sinh(2*beta*j); sinh(2*beta*j) cosh(2*beta*j)]
+    return exp(-2*beta*j)*M
+end
 function energytensor(j)
     return [j -j ; -j j]
 end
@@ -60,11 +64,21 @@ function isingTensor(beta, j, h)
     return T
 end
 
+function isingTensor2(beta, j, h)
+    D = zeros(Int, 2, 2, 2, 2)
+    for i in 1:2
+        D[i, i, i, i] = 1
+    end
+    M = sqrt(isingMatrix2(beta, j, h))
+    @tensor T[i,j,k,l] := D[a, b, c, d] * M[i,a] * M[j,b] * M[k,c] * M[l,d]
+    return T
+end
+
 function tensormagnetize(beta, j, h)
     D = zeros(Int, 2, 2, 2, 2)
     D[1, 1, 1, 1] = 1
     D[2, 2, 2, 2] = -1
-    M = sqrt(isingMatrix(beta, j, h))
+    M = sqrt(isingMatrix2(beta, j, h))
     @tensor T[i,j,k,l] := D[a, b, c, d] * M[i,a] * M[j,b] * M[k,c] * M[l,d]
     return T
     @show size(T)
@@ -131,7 +145,7 @@ returns the final MPS for the 2D Ising model after applying TEBD and n sweeps
 """
 function ising2D(N, D0, d, J, h, β, n_sweeps, Dmax, rejected_weight, cutoff)
     #@show "Begin"
-    gate = isingTensor(β, J, h) # Example parameters for the Ising tensor
+    gate = isingTensor2(β, J, h) # Example parameters for the Ising tensor
     mps = init_random_mps(N, d, D0)
     for i in 1:n_sweeps
         #@show "SWEEP i =", i
