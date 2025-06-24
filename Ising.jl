@@ -52,7 +52,7 @@ function isingMatrix2(beta, j, h=0)
     return exp(-2*beta*j)*M
 end
 function energytensor(j)
-    return [j -j ; -j j]
+    return j*[1 -1 ; -1 1]
 end
 function isingTensor(beta, j, h)
     D = zeros(Int, 2, 2, 2, 2)
@@ -78,7 +78,7 @@ function tensormagnetize(beta, j, h)
     D = zeros(Int, 2, 2, 2, 2)
     D[1, 1, 1, 1] = 1
     D[2, 2, 2, 2] = -1
-    M = sqrt(isingMatrix2(beta, j, h))
+    M = sqrt(isingMatrix(beta, j, h))
     @tensor T[i,j,k,l] := D[a, b, c, d] * M[i,a] * M[j,b] * M[k,c] * M[l,d]
     return T
     @show size(T)
@@ -145,7 +145,7 @@ returns the final MPS for the 2D Ising model after applying TEBD and n sweeps
 """
 function ising2D(N, D0, d, J, h, β, n_sweeps, Dmax, rejected_weight, cutoff)
     #@show "Begin"
-    gate = isingTensor2(β, J, h) # Example parameters for the Ising tensor
+    gate = isingTensor(β, J, h) # Example parameters for the Ising tensor
     mps = init_random_mps(N, d, D0)
     for i in 1:n_sweeps
         #@show "SWEEP i =", i
@@ -193,7 +193,6 @@ end
 
 function magnetizationIsing(mps, j, i_meas)
     n = length(mps)
-    @show n
     if !(1 < i_meas < n-1)
         throw(ArgumentError("site is not in the mps"))
     end
@@ -202,7 +201,7 @@ function magnetizationIsing(mps, j, i_meas)
     center_canonical_mps = deepcopy(mps)
     center_canonical_mps[begin:i_meas], _ = canonicalleft!(center_canonical_mps[begin:i_meas])
     #%% contraction
-    @show size(center_canonical_mps[i_meas])
+    #@show size(center_canonical_mps[i_meas])
     ket = tensorcontract((-2, -1, -3, -4), center_canonical_mps[i_meas], (-1, -2, 1), center_canonical_mps[i_meas+1], (-3, 1, -4)) #(gauche, physique, physique, droite)
     inter0 = tensorcontract((-1, -3, -4, -2), ket, (-1, 1, 2, -2), bond_operator, (1, 2, -3, -4)) #(gauche, physique, physique, droite)
     bras = tensorcontract((-2, -1, -3, -4), conj(center_canonical_mps[i_meas]), (-1, -2, 1), conj(center_canonical_mps[i_meas+1]), (-3, 1, -4)) #meme format
@@ -212,20 +211,20 @@ end
 
 
 site_measure = N ÷ 2
-@show site_measure
-Betalist = collect(0.1:0.1:2)
+Betalist = collect(0.1:0.01:2)
 #Betalist = [0.1, 0.2]
 Eexact = ExactEnergy.(Betalist)
 Mexact = exactmagnetization.(Betalist)
 
 MPSlist = map(β -> ising2D(N, D0, d, J, h, β, 100, Dmax, rejected_weight, cutoff), Betalist);
-Elist = map(mps -> energyIsing(mps, J, site_measure), MPSlist)
+Elist = map(mps -> energyIsing(mps, J, site_measure), MPSlist);
 Mlist = map(mps -> magnetizationIsing(mps, J, site_measure), MPSlist)
 #on fait les données et on trace
 gr()
 p1 = plot(Betalist, -2*Elist, label="TEBD", xlabel="\$\\beta\$", ylabel="Energy")
 plot!(Betalist, Eexact, label="exact")
 display(p1)
+
 
 p2 = plot(Betalist, abs.(Mlist), label="TEBD", xlabel="\$\\beta\$", ylabel="Magnetization")
 plot!(Betalist, Mexact, label="exact")

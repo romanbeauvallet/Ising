@@ -142,7 +142,7 @@ end
 """
 Normalize the MPS represented by the array M
 """
-function normalize(M::Vector{Array{}})
+function normalizee(M::Vector{Array{}})
     N = length(M)
     G = dagger(M)
     C = tensorcontract(G[1], [1, -1, 2], M[1], [1, 2, -2])
