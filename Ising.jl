@@ -147,10 +147,12 @@ end
 MPS - mettre le MPS final avec l'évolution avec le tenseur d'Ising il est censé être en right canonical donc avec toute l'information dans le tenseur de gauche au bout
 beta, J, h - paramètre physiques
 i - site du MPS sur lequel on calcule l'énergie
+gate -- magnetization tensor
+gatenorm -- ising tensor to compute norm of the environment
 
 return l'énergie sur le site i du MPS
 """
-function energyIsing(mps, J, i_meas)#mettre un ! au debut du nom de la fonction pour spécifier que la fonction modifie l'input
+function energyIsing!(mps, J, i_meas, gate, gatenorm)#mettre un ! au debut du nom de la fonction pour spécifier que la fonction modifie l'input
     #mettre en left et right canonical par rapport au tenseur i
     #garder seulement le centre car toute l'information du mps y est
     #contracter entre le tenseur et le dagger la matrice énergie et contracter tous les axes
@@ -158,26 +160,17 @@ function energyIsing(mps, J, i_meas)#mettre un ! au debut du nom de la fonction 
 
     #%% orthonormalisation
     N = length(mps)
-    if !(1 < i_meas < N)
+    if !(1 < i_meas < N - 2)
         throw(ArgumentError("site is not in the mps"))
     end
-    bond_operator = energytensor(J)
-    #@show size(MPS[1:i]), size(canonicalleft(MPS[1:i])[1])
-    center_canonical_mps = deepcopy(mps)
-    center_canonical_mps[begin:i_meas], _ = canonicalleft!(center_canonical_mps[begin:i_meas])
-    #verif
-    I = tensorcontract(center_canonical_mps[i_meas-1], (1, 2, -1), conj(center_canonical_mps[i_meas-1]), (1, 2, -2))
-    @assert I ≈ LinearAlgebra.I(size(I, 1))
-    I2 = tensorcontract(center_canonical_mps[i_meas+1], (1, -1, 2), conj(center_canonical_mps[i_meas+1]), (1, -2, 2))
-    @assert I2 ≈ LinearAlgebra.I(size(I2, 1))
-    #%% contraction
-    ket = center_canonical_mps[i_meas]
-    #@show size(ket), typeof(ket)
-    #mps_norm = tensorcontract(ket, (1, 2, 3), conj(ket), (1, 2, 3))
-    #@show mps_norm
-    inter = tensorcontract((-1, -2, -3), conj(ket), (1, -2, -3), bond_operator, (1, -1))
-    E = tensorcontract(inter, (1, 2, 3), ket, (1, 2, 3))[]
-    return E
+    mps[begin:i_meas], _ = canonicalleft!(mps[begin:i_meas])
+    env_up = mps[i_meas, i_meas+2]
+    env_down = dagger(env_up)
+    @tensor ket[gauche, physique1, physique2, physique3, droite] := env_up[1][physique1, gauche, i] * env_up[2][physique2, i, j] * env_up[3][physique3, j, droite]
+    @tensor bras[gaucheaux, physiqueaux1, physiqueaux2, physiqueaux3, droiteaux] := env_down[1][physiqueaux1, i, gaucheaux] * env_down[2][physiqueaux2, j, i] * env_down[3][physiqueaux3, droiteaux, j]
+    @tensor energynonorm[] := ket[endleft, physique1, physique2, physique3, endright] * gate[physique1, physique2, i, physiqueaux1] * gate[i, physique3, physiqueaux3, physiqueaux2]*bras[endleft, physiqueaux1, physiqueaux2, physiqueaux3, endright]
+    @tensor norm[] := ket[endleft, physique1, physique2, physique3, endright] * gatenorm[physique1, physique2, i, physiqueaux1] * gatenorm[i, physique3, physiqueaux3, physiqueaux2]*bras[endleft, physiqueaux1, physiqueaux2, physiqueaux3, endright]
+    return energynonorm/norm
 end
 
 function magnetizationIsing(mps, gate, i_meas)
