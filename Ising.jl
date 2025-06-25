@@ -164,13 +164,13 @@ function energyIsing!(mps, J, i_meas, gate, gatenorm)#mettre un ! au debut du no
         throw(ArgumentError("site is not in the mps"))
     end
     mps[begin:i_meas], _ = canonicalleft!(mps[begin:i_meas])
-    env_up = mps[i_meas, i_meas+2]
+    env_up = mps[i_meas: i_meas+2]
     env_down = dagger(env_up)
     @tensor ket[gauche, physique1, physique2, physique3, droite] := env_up[1][physique1, gauche, i] * env_up[2][physique2, i, j] * env_up[3][physique3, j, droite]
     @tensor bras[gaucheaux, physiqueaux1, physiqueaux2, physiqueaux3, droiteaux] := env_down[1][physiqueaux1, i, gaucheaux] * env_down[2][physiqueaux2, j, i] * env_down[3][physiqueaux3, droiteaux, j]
     @tensor energynonorm[] := ket[endleft, physique1, physique2, physique3, endright] * gate[physique1, physique2, i, physiqueaux1] * gate[i, physique3, physiqueaux3, physiqueaux2]*bras[endleft, physiqueaux1, physiqueaux2, physiqueaux3, endright]
     @tensor norm[] := ket[endleft, physique1, physique2, physique3, endright] * gatenorm[physique1, physique2, i, physiqueaux1] * gatenorm[i, physique3, physiqueaux3, physiqueaux2]*bras[endleft, physiqueaux1, physiqueaux2, physiqueaux3, endright]
-    return energynonorm/norm
+    return only(energynonorm)/only(norm)
 end
 
 function magnetizationIsing(mps, gate, i_meas)
@@ -197,7 +197,7 @@ N = 30 #ATTENTION N doit être pair
 d = 2
 D0 = 10
 Dmax = 100
-cutoff = 1e-12
+cutoff = 1e-20
 rejected_weight = 1e-20
 
 
@@ -216,12 +216,17 @@ test = init_random_mps(N, d, D0)
 push!(MPSlist, test)
 function loop()
     for i in eachindex(Betalist)
+        @show Betalist[i]
         operator = tensormagnetize(Betalist[i], J, h)
-        mpsbeta = ising2D(MPSlist[i], J, h, Betalist[i], 200, Dmax, rejected_weight, cutoff)
+        norm_operator = isingTensor(Betalist[i], J, h)
+        mpsbeta = ising2D(MPSlist[i], J, h, Betalist[i], 100, Dmax, rejected_weight, cutoff)
         m = magnetizationIsing(mpsbeta, operator, site_measure)
+        @show m
+        e = energyIsing!(mpsbeta, J, site_measure, operator, norm_operator)
+        @show e
         push!(MPSlist, mpsbeta)
         push!(Mlist, m)
-        @show m, Betalist[i]
+        push!(Elist, e)
     end
 end
 
@@ -230,13 +235,12 @@ loop()
 #on fait les données et on trace
 gr()
 
-plot(Betalist, abs.(Mlist), label="tebd")
 
-#p1 = plot(Betalist, -2*Elist, label="TEBD", xlabel="\$\\beta\$", ylabel="Energy")
-#plot!(Betalist, Eexact, label="exact")
-#display(p1)
+p1 = plot(Betalist, -2*Elist, label="TEBD", xlabel="\$\\beta\$", ylabel="Energy")
+plot!(Betalist, Eexact, label="exact")
+display(p1)
 
 
 #p2 = plot(Betalist, abs.(Mlist), label="TEBD", xlabel="\$\\beta\$", ylabel="Magnetization")
-plot!(Betalist, Mexact, label="exact")
+#plot!(Betalist, Mexact, label="exact")
 #display(p2)
