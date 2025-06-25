@@ -226,32 +226,31 @@ dmax is the maximum bond dimension
 cutoff is the threshold for truncation, every value under cutoff are erased
 
 """
-function tronquer(A, B, C, Dmax, cutoff, rejected_weight)
-    #cutoff
-    #@show B
-    cuteff = norm(B) * cutoff
-    p = maximum(findall(x -> x > cuteff, B))
-    #@show p
-    K = B[1:p] #S est ordonné dans l'ordre décroissant, on enlève les valeurs sous le cutoff
-    n = length(K)
-    #poids rejeté
-    s = 0
-    i = n
-    while s < rejected_weight && i > 1
-        s += K[i]
-        i -= 1
+function tronquer(u, s, v, Dmax, cutoff, rejected_weight)
+    cutoff_cut = findfirst(<(cutoff), s)
+    if isnothing(cutoff_cut)
+        cutoff_cut = Dmax
+    else
+        cutoff_cut = cutoff_cut - 1
     end
-    #@show i
-    q = minimum([Dmax, i + 1]) #on tronque à Dmax ou à i avec i+1 car boucle while
-    K = K[1:q]
-    #@show q
-    return A[:, 1:q], K, C[:, 1:q] #attention on utilise C' donc on cut les colonnes de C
+
+    cumsum_weights = reverse(cumsum(reverse(s)))
+    rejected_weight_cutoff = findfirst(<(rejected_weight), cumsum_weights)
+    if isnothing(rejected_weight_cutoff)
+        rejected_weight_cutoff = Dmax
+    else
+        rejected_weight_cutoff = rejected_weight_cutoff - 1
+    end
+
+    cut = minimum([length(s), Dmax, cutoff_cut, rejected_weight_cutoff])
+    return u[:, 1:cut], s[1:cut], v[:, 1:cut] #attention on utilise V' donc on cut les colonnes de V
 end
 """
 MPS -- a matrix product state represented as a vector of tensors
 return the left canonical form of this tensor
 """
-function canonicalleft!(mps) #(physique, gauche, droite)
+function canonicalleft(mps0) #(physique, gauche, droite)
+    mps = deepcopy(mps0)
     n = length(mps)
     mPS_canonical = Vector{eltype(mps)}(undef, n)
     leftcenter = Vector{eltype(mps)}(undef, n)
@@ -275,7 +274,8 @@ end
 """
 return the right canonical form of this tensor
 """
-function canonicalright!(mps) #(physique, gauche, droite)
+function canonicalright(mps0) #(physique, gauche, droite)
+    mps = deepcopy(mps0)
     n = length(mps)
     mPS_canonical = Vector{eltype(mps)}(undef, n)#pas initialisé comme ça
     rightcenter = Vector{eltype(mps)}(undef, n)
@@ -379,17 +379,3 @@ function tebd_step(left, right, gate, side::String, Dmax, cutoff, rejected_weigh
     B = permutedims(B, (2, 1, 3))
     return A, B
 end
-
-test = init_random_mps(20, 2, 100) 
-copytest = deepcopy(test)
-test_right, centerr = canonicalright!(test)
-@show size.(test_right)
-test_left, centerl = canonicalleft!(copytest)
-@show size.(test_left)
-
-idleft, d = contractcanon(test_left, dagger(test_left), "left", 5)
-idright, q = contractcanon(test_right, dagger(test_right), "right", 18)
-
-@show Matrix{Float64}(I, d) ≈ idleft
-@show Matrix{Float64}(I, q) ≈ idright
-
