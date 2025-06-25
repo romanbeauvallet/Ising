@@ -150,6 +150,8 @@ i - site du MPS sur lequel on calcule l'énergie
 gate -- magnetization tensor
 gatenorm -- ising tensor to compute norm of the environment
 
+on prend la gate dans l'ordre (gauche, up, droite, down)
+
 return l'énergie sur le site i du MPS
 """
 function energyIsing!(mps, J, i_meas, gate, gatenorm)#mettre un ! au debut du nom de la fonction pour spécifier que la fonction modifie l'input
@@ -157,7 +159,7 @@ function energyIsing!(mps, J, i_meas, gate, gatenorm)#mettre un ! au debut du no
     #garder seulement le centre car toute l'information du mps y est
     #contracter entre le tenseur et le dagger la matrice énergie et contracter tous les axes
     #vérifier que la norme du mps est bien 1 (si pas le cas normaliser la contraction précédente par la norme du tenseur)
-
+    #on prend la gate dans l'ordre (gauche, up, droite, down)
     #%% orthonormalisation
     N = length(mps)
     if !(1 < i_meas < N - 2)
