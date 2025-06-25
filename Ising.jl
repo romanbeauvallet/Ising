@@ -34,7 +34,7 @@ function isingMatrix(beta, J, h=0)
     # Create the Ising matrix for a single site
     M = exp(beta * J) * LinearAlgebra.I(2) # Identity matrix
     return M + exp(-beta * J) * [0 1; 1 0] + h * [1 0; 0 -1]
-end     
+end
 function isingMatrix2(beta, j, h=0)
     M = [cosh(2 * beta * j) sinh(2 * beta * j); sinh(2 * beta * j) cosh(2 * beta * j)]
     return exp(-2 * beta * j) * M
@@ -197,16 +197,16 @@ end
 J = 1.0
 h = 0.0
 n = 10
-N = 30 #ATTENTION N doit être pair
+N = 20 #ATTENTION N doit être pair
 d = 2
 D0 = 10
 Dmax = 100
-cutoff = 1e-20
+cutoff = 1e-50
 rejected_weight = 1e-20
 
 
 site_measure = N ÷ 2
-Betalist = collect(0.1:0.1:2)
+Betalist = collect(0.1:0.01:1)
 #Betalist = [0.1, 0.2]
 Eexact = ExactEnergy.(Betalist)
 Mexact = exactmagnetization.(Betalist)
@@ -220,10 +220,10 @@ test = init_random_mps(N, d, D0)
 push!(MPSlist, test)
 function loop()
     for i in eachindex(Betalist)
-        @show Betalist[i]
+        @show Betalist[i], i
         operator = tensormagnetize(Betalist[i], J, h)
         norm_operator = isingTensor(Betalist[i], J, h)
-        mpsbeta = ising2D(MPSlist[i], J, h, Betalist[i], 200, Dmax, rejected_weight, cutoff)
+        mpsbeta = ising2D(MPSlist[i], J, h, Betalist[i], 100, Dmax, rejected_weight, cutoff)
         #m = magnetizationIsing(mpsbeta, operator, site_measure, norm_operator)
         #@show m
         e = energyIsing(mpsbeta, J, site_measure, operator, norm_operator)
@@ -238,5 +238,5 @@ loop()
 
 gr()
 
-plot(Betalist, Mlist, label="tebd")
-plot!(Betalist, Mexact, label="exact")
+plot(Betalist, -2 * Elist, label="tebd")
+plot!(Betalist, Eexact, label="exact")
