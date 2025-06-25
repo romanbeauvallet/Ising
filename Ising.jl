@@ -135,9 +135,10 @@ returns the final MPS for the 2D Ising model after applying TEBD and n sweeps
 function ising2D(mpsin, J, h, β, n_sweeps, Dmax, rejected_weight, cutoff)
     #@show "Begin"
     gate = isingTensor(β, J, h) # Example parameters for the Ising tensor
+    mps = deepcopy(mpsin)
     for i in 1:n_sweeps
-        #@show "SWEEP i =", i
-        mps = tebd_sweep(mpsin, gate, Dmax, rejected_weight, cutoff)
+        #@show i
+        mps = tebd_sweep(mps, gate, Dmax, rejected_weight, cutoff)
     end
     return mps
 end
@@ -201,7 +202,7 @@ h = 0.0
 n = 10
 N = 30 #ATTENTION N doit être pair
 d = 2
-D0 = 4
+D0 = 10
 Dmax = 100
 cutoff = 1e-12
 rejected_weight = 1e-20
@@ -215,33 +216,34 @@ Mexact = exactmagnetization.(Betalist)
 
 Elist = Vector{Float64}()
 Mlist = Vector{Float64}()
-
-function run_loop()
-    mpsinit = init_random_mps(N, d, D0)
-    @show size.(mpsinit)
-    @show size.(canonicalright!(mpsinit)[1])
+MPSlist = Vector{}()
+test = init_random_mps(N, d, D0)
+#mpstestising = ising2D(test, J, h, 0.1, 100, Dmax, rejected_weight, cutoff)
+#@show size.(mpstestising)
+push!(MPSlist, test)
+function loop()
     for i in eachindex(Betalist)
-        betatrue = Betalist[i]
-        @show i
-        mpsinit = ising2D(mpsinit, J, h, betatrue, 100, Dmax, rejected_weight, cutoff)
-        @show size(mpsinit)
-        bond_operator = tensormagnetize(betatrue, J, h)
-        M = magnetizationIsing(mpsinit, bond_operator, site_measure)
-        f = magnetizationIsing(mpsinit, isingTensor(betatrue, J, h), site_measure)
-        push!(Mlist, M / f)
-        @show i, betatrue, M, f
+        operator = tensormagnetize(Betalist[i], J, h)
+        mpsbeta = ising2D(MPSlist[i], J, h, Betalist[i], 200, Dmax, rejected_weight, cutoff)
+        m = magnetizationIsing(mpsbeta, operator, site_measure)
+        push!(MPSlist, mpsbeta)
+        push!(Mlist, m)
+        @show m, Betalist[i]
     end
 end
 
-run_loop()
+loop()
 
 #on fait les données et on trace
 gr()
+
+plot(Betalist, abs.(Mlist), label="tebd")
+
 #p1 = plot(Betalist, -2*Elist, label="TEBD", xlabel="\$\\beta\$", ylabel="Energy")
 #plot!(Betalist, Eexact, label="exact")
 #display(p1)
 
 
-p2 = plot(Betalist, abs.(Mlist), label="TEBD", xlabel="\$\\beta\$", ylabel="Magnetization")
+#p2 = plot(Betalist, abs.(Mlist), label="TEBD", xlabel="\$\\beta\$", ylabel="Magnetization")
 plot!(Betalist, Mexact, label="exact")
-display(p2)
+#display(p2)
