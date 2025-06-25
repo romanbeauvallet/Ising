@@ -2,7 +2,6 @@
 using LinearAlgebra
 using TensorOperations
 using Plots
-using CairoMakie
 using HCubature
 using SpecialFunctions
 
@@ -35,8 +34,7 @@ function isingMatrix(beta, J, h=0)
     # Create the Ising matrix for a single site
     M = exp(beta * J) * LinearAlgebra.I(2) # Identity matrix
     return M + exp(-beta * J) * [0 1; 1 0] + h * [1 0; 0 -1]
-end
-
+end     
 function isingMatrix2(beta, j, h=0)
     M = [cosh(2 * beta * j) sinh(2 * beta * j); sinh(2 * beta * j) cosh(2 * beta * j)]
     return exp(-2 * beta * j) * M
@@ -155,7 +153,7 @@ on prend la gate dans l'ordre (gauche, up, droite, down)
 
 return l'énergie sur le site i du MPS
 """
-function energyIsing!(mps, J, i_meas, gate, gatenorm)#mettre un ! au debut du nom de la fonction pour spécifier que la fonction modifie l'input
+function energyIsing(mps, J, i_meas, gate, gatenorm)#mettre un ! au debut du nom de la fonction pour spécifier que la fonction modifie l'input
     #mettre en left et right canonical par rapport au tenseur i
     #garder seulement le centre car toute l'information du mps y est
     #contracter entre le tenseur et le dagger la matrice énergie et contracter tous les axes
@@ -166,7 +164,8 @@ function energyIsing!(mps, J, i_meas, gate, gatenorm)#mettre un ! au debut du no
     if !(1 < i_meas < N - 2)
         throw(ArgumentError("site is not in the mps"))
     end
-    mps[begin:i_meas], _ = canonicalleft!(mps[begin:i_meas])
+    copymps = deepcopy(mps)
+    copymps[begin:i_meas], _ = canonicalleft!(copymps[begin:i_meas])
     env_up = mps[i_meas:i_meas+2]
     env_down = dagger(env_up)
     @tensor ket[gauche, physique1, physique2, physique3, droite] := env_up[1][physique1, gauche, i] * env_up[2][physique2, i, j] * env_up[3][physique3, j, droite]
@@ -176,7 +175,7 @@ function energyIsing!(mps, J, i_meas, gate, gatenorm)#mettre un ! au debut du no
     return only(energynonorm) / only(norm)
 end
 
-function magnetizationIsing(mps, gate, i_meas)
+function magnetizationIsing(mps, gate, i_meas, gatenorm)
     n = length(mps)
     if !(1 < i_meas < n - 1)
         throw(ArgumentError("site is not in the mps"))
@@ -185,12 +184,14 @@ function magnetizationIsing(mps, gate, i_meas)
     center_canonical_mps = deepcopy(mps)
     center_canonical_mps[begin:i_meas], _ = canonicalleft!(center_canonical_mps[begin:i_meas])
     #%% contraction
+    env_up = center_canonical_mps[i_meas:i_meas+1]
+    env_down = dagger(env_up)
     #@show size(center_canonical_mps[i_meas])
-    ket = tensorcontract((-2, -1, -3, -4), center_canonical_mps[i_meas], (-1, -2, 1), center_canonical_mps[i_meas+1], (-3, 1, -4)) #(gauche, physique, physique, droite)
-    inter0 = tensorcontract((-1, -3, -4, -2), ket, (-1, 1, 2, -2), gate, (1, 2, -3, -4)) #(gauche, physique, physique, droite)
-    bras = tensorcontract((-2, -1, -3, -4), conj(center_canonical_mps[i_meas]), (-1, -2, 1), conj(center_canonical_mps[i_meas+1]), (-3, 1, -4)) #meme format
-    E = tensorcontract(inter0, (1, 2, 3, 4), bras, (1, 2, 3, 4))[]
-    return E
+    @tensor ket[gauche, physique1, physique2, droite] := env_up[1][physique1, gauche, i] * env_up[2][physique2, i, droite]
+    @tensor bras[gaucheaux, physiqueaux1, physiqueaux2, droiteaux] := env_down[1][physiqueaux1, i, gaucheaux] * env_down[2][physiqueaux2, droiteaux, i]
+    @tensor m[] := ket[i, physique1, physique2, j] * bras[i, physiqueaux1, physiqueaux2, j] * gate[physique1, physique2, physiqueaux1, physiqueaux2]
+    @tensor n[] := ket[i, physique1, physique2, j] * bras[i, physiqueaux1, physiqueaux2, j] * gatenorm[physique1, physique2, physiqueaux1, physiqueaux2]
+    return only(m) / only(n)
 end
 
 J = 1.0
@@ -205,7 +206,7 @@ rejected_weight = 1e-20
 
 
 site_measure = N ÷ 2
-Betalist = collect(0.1:0.1:1)
+Betalist = collect(0.1:0.1:2)
 #Betalist = [0.1, 0.2]
 Eexact = ExactEnergy.(Betalist)
 Mexact = exactmagnetization.(Betalist)
@@ -223,32 +224,19 @@ function loop()
         operator = tensormagnetize(Betalist[i], J, h)
         norm_operator = isingTensor(Betalist[i], J, h)
         mpsbeta = ising2D(MPSlist[i], J, h, Betalist[i], 200, Dmax, rejected_weight, cutoff)
-        m = magnetizationIsing(mpsbeta, operator, site_measure)
-        @show m
-        e = energyIsing!(mpsbeta, J, site_measure, operator, norm_operator)
-        @show e
+        #m = magnetizationIsing(mpsbeta, operator, site_measure, norm_operator)
+        #@show m
+        e = energyIsing(mpsbeta, J, site_measure, operator, norm_operator)
+        #@show e
         push!(MPSlist, mpsbeta)
-        push!(Mlist, m)
+        #push!(Mlist, m)
         push!(Elist, e)
     end
 end
 
 loop()
 
-#on fait les données et on trace
+gr()
 
-# === Première fenêtre ===
-fig1 = Figure(;size = (600, 400))
-ax1 = Axis(fig1[1, 1], title = "Fenêtre 1 : energy")
-lines!(ax1, Betalist, -2*Elist, label = "tebd")
-lines!(ax1, Betalist, Eexact, label = "exact)")
-axislegend(ax1)
-display(fig1)  # Ouvre une première vraie fenêtre
-
-# === Deuxième fenêtre ===
-fig2 = Figure(;size = (600, 400))
-ax2 = Axis(fig2[1, 1], title = "Fenêtre 2 : magnetization")
-lines!(ax2, Betalist, Mexact, label = "exact")
-lines!(ax2, Betalist, Mlist, label = "tebd")
-axislegend(ax2)
-display(fig2)  # Ouvre une deuxième vraie fenêtre
+plot(Betalist, Mlist, label="tebd")
+plot!(Betalist, Mexact, label="exact")
