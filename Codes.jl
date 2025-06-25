@@ -379,3 +379,17 @@ function tebd_step(left, right, gate, side::String, Dmax, cutoff, rejected_weigh
     B = permutedims(B, (2, 1, 3))
     return A, B
 end
+
+test = init_random_mps(20, 2, 100) 
+copytest = deepcopy(test)
+test_right, centerr = canonicalright!(test)
+@show size.(test_right)
+test_left, centerl = canonicalleft!(copytest)
+@show size.(test_left)
+
+idleft, d = contractcanon(test_left, dagger(test_left), "left", 5)
+idright, q = contractcanon(test_right, dagger(test_right), "right", 18)
+
+@show Matrix{Float64}(I, d) ≈ idleft
+@show Matrix{Float64}(I, q) ≈ idright
+

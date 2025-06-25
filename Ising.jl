@@ -132,13 +132,12 @@ side - side of the lattice
 
 returns the final MPS for the 2D Ising model after applying TEBD and n sweeps
 """
-function ising2D(N, D0, d, J, h, β, n_sweeps, Dmax, rejected_weight, cutoff)
+function ising2D(mpsin, J, h, β, n_sweeps, Dmax, rejected_weight, cutoff)
     #@show "Begin"
     gate = isingTensor(β, J, h) # Example parameters for the Ising tensor
-    mps = init_random_mps(N, d, D0)
     for i in 1:n_sweeps
         #@show "SWEEP i =", i
-        mps = tebd_sweep(mps, gate, Dmax, rejected_weight, cutoff)
+        mps = tebd_sweep(mpsin, gate, Dmax, rejected_weight, cutoff)
     end
     return mps
 end
@@ -217,15 +216,24 @@ Mexact = exactmagnetization.(Betalist)
 Elist = Vector{Float64}()
 Mlist = Vector{Float64}()
 
-for i in eachindex(Betalist)
-    beta = Betalist[i]
-    MPS = ising2D(N, D0, d, J, h, beta, 100, Dmax, rejected_weight, cutoff)
-    bond_operator = tensormagnetize(beta, J, h)
-    M = magnetizationIsing(MPS, bond_operator, site_measure)
-    f = magnetizationIsing(MPS, isingTensor(beta, J, h), site_measure)
-    push!(Mlist, M / f)
-    @show i, beta, M, f
+function run_loop()
+    mpsinit = init_random_mps(N, d, D0)
+    @show size.(mpsinit)
+    @show size.(canonicalright!(mpsinit)[1])
+    for i in eachindex(Betalist)
+        betatrue = Betalist[i]
+        @show i
+        mpsinit = ising2D(mpsinit, J, h, betatrue, 100, Dmax, rejected_weight, cutoff)
+        @show size(mpsinit)
+        bond_operator = tensormagnetize(betatrue, J, h)
+        M = magnetizationIsing(mpsinit, bond_operator, site_measure)
+        f = magnetizationIsing(mpsinit, isingTensor(betatrue, J, h), site_measure)
+        push!(Mlist, M / f)
+        @show i, betatrue, M, f
+    end
 end
+
+run_loop()
 
 #on fait les données et on trace
 gr()
